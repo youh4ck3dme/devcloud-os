@@ -1,0 +1,5 @@
+{
+  "name": "DevCloud OS",
+  "description": "Industrial-grade developer control panel with persistent auth and snap scrolling.",
+  "requestFramePermissions": []
+}

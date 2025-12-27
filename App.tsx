@@ -1504,13 +1504,13 @@ const LoginScreen = () => {
       />
 
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-brand-accent/10 blur-[60px] sm:blur-[100px] rounded-full pointer-events-none z-1" />
-      <div className="relative z-10 w-full max-w-sm glass-modal rounded-[32px] sm:rounded-[40px] p-6 sm:p-10 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-500">
-        <div className="w-14 h-14 sm:w-16 sm:h-16 bg-brand-accent rounded-[20px] mx-auto mb-6 sm:mb-8 flex items-center justify-center shadow-2xl shadow-brand-accent/30 animate-pulse">
-          <ShieldCheck size={28} className="text-white sm:w-8 sm:h-8" />
+      <div className="relative z-10 w-full max-w-md glass-modal rounded-[32px] sm:rounded-[40px] p-10 sm:p-16 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+        <div className="w-20 h-20 sm:w-24 sm:h-24 bg-brand-accent rounded-[24px] mx-auto mb-8 flex items-center justify-center shadow-2xl shadow-brand-accent/30 animate-pulse">
+          <ShieldCheck size={40} className="text-white sm:w-10 sm:h-10" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-bold mb-2 tracking-tight text-white">DEVCLOUD OS</h1>
-        <p className="text-[10px] sm:text-xs text-text-sec uppercase tracking-[0.3em] mb-8 sm:mb-10">Access Token Required</p>
-        <input type="password" className={`w-full bg-black/50 border ${err ? 'border-red-500' : 'border-white/10'} rounded-2xl px-6 py-4 mb-6 text-center outline-none focus:border-brand-accent transition-all text-white text-lg`} placeholder="••••••••" value={pass} onChange={e => { setPass(e.target.value); setErr(false); }} />
+        <h1 className="text-3xl sm:text-4xl font-bold mb-3 tracking-tight text-white">DEVCLOUD OS</h1>
+        <p className="text-xs sm:text-sm text-text-sec uppercase tracking-[0.3em] mb-10 text-white/60">Access Token Required</p>
+        <input type="password" className={`w-full bg-black/50 border ${err ? 'border-red-500' : 'border-white/10'} rounded-2xl px-6 py-5 mb-6 text-center outline-none focus:border-brand-accent transition-all text-white text-xl placeholder:text-white/20`} placeholder="••••••••" value={pass} onChange={e => { setPass(e.target.value); setErr(false); }} />
         <button onClick={async () => { 
             setLoading(true); 
             addToast('Overovanie...', 'loading');
@@ -1523,10 +1523,10 @@ const LoginScreen = () => {
               addToast('Vitajte v systéme', 'success');
             }
             setLoading(false); 
-        }} className="w-full h-14 bg-white text-black rounded-2xl font-bold uppercase tracking-widest text-xs active:scale-95 transition-all shadow-xl flex items-center justify-center">
-            {loading ? <Loader2 className="animate-spin" size={18} /> : 'Initialize'}
+        }} className="w-full h-16 bg-white text-black rounded-2xl font-bold uppercase tracking-widest text-sm active:scale-95 transition-all shadow-xl flex items-center justify-center hover:bg-gray-100">
+            {loading ? <Loader2 className="animate-spin" size={20} /> : 'Initialize System'}
         </button>
-        <p className="mt-8 text-[10px] text-text-sec uppercase font-mono tracking-widest">Predvolené: admin123</p>
+        <p className="mt-8 text-xs text-text-sec uppercase font-mono tracking-widest opacity-50">Predvolené: admin123</p>
       </div>
     </div>
   );

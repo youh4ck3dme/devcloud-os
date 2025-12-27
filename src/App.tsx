@@ -367,7 +367,7 @@ const Badge = ({ children, status = 'default' }: { children?: ReactNode, status?
 
 const Toaster = ({ toasts, removeToast }: { toasts: Toast[], removeToast: (id: string) => void }) => {
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:bottom-6 md:right-6 md:left-auto md:w-auto z-[100] flex flex-col gap-2 pointer-events-none">
+    <div className="fixed bottom-4 left-4 right-4 md:bottom-6 md:right-6 md:left-auto md:w-auto z-100 flex flex-col gap-2 pointer-events-none">
       {toasts.map((toast) => (
         <div key={toast.id} className="pointer-events-auto flex items-center gap-3 bg-[#0E0E0E]/90 backdrop-blur-md border border-white/10 text-sm p-3 rounded-lg shadow-2xl w-full md:min-w-[300px] animate-in slide-in-from-bottom-5 md:slide-in-from-right-full fade-in duration-300">
           {toast.type === 'success' && <CheckCircle size={16} className="text-green-500 shrink-0" />}
@@ -428,7 +428,7 @@ const LoginScreen = () => {
   };
 
   return (
-    <div className="relative min-h-[100dvh] w-full flex items-center justify-center bg-root overflow-hidden px-4">
+    <div className="relative min-h-dvh w-full flex items-center justify-center bg-root overflow-hidden px-4">
       <div className="login-glow" />
       <div className="relative z-10 w-full max-w-sm animate-in fade-in zoom-in-95 duration-500">
         <div className="mb-8 text-center">
@@ -593,7 +593,7 @@ const MainLayout = () => {
   const [view, setView] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   return (
-    <div className="min-h-[100dvh] bg-root text-text-primary overflow-hidden flex flex-col">
+    <div className="min-h-dvh bg-root text-text-primary overflow-hidden flex flex-col">
       <Header currentView={view} setView={setView} onMenuClick={() => setIsSidebarOpen(true)} />
       <main className="flex-1 pt-14">
         {view === 'dashboard' ? <DashboardView isSidebarOpen={isSidebarOpen} onCloseSidebar={() => setIsSidebarOpen(false)} /> : <TerminalView />}

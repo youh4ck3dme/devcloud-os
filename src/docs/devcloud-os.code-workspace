@@ -1,8 +1,10 @@
 {
-	"folders": [
+    "settings": {
+        "files.autoSave": "afterDelay"
+    },
+    "folders": [
 		{
 			"path": "../.."
 		}
-	],
-	"settings": {}
+	]
 }

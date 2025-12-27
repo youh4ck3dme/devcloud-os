@@ -48,6 +48,7 @@ import {
   ExternalLink,
   Eye
 } from 'lucide-react';
+import AudioCloudCanvas from './src/components/AudioCloudCanvas';
 
 // --- TYPES & INTERFACES ---
 
@@ -96,6 +97,7 @@ interface CloudFile {
     sizes?: {
       thumbnail?: { source_url: string };
       medium?: { source_url: string };
+      full?: { source_url: string };
     };
   };
   source_url: string;
@@ -185,7 +187,7 @@ const CloudContext = createContext<CloudContextType | undefined>(undefined);
 
 const Toaster = ({ toasts, removeToast }: { toasts: Toast[], removeToast: (id: string) => void }) => {
   return (
-    <div className="fixed bottom-20 right-4 left-4 md:left-auto md:bottom-10 z-[200] flex flex-col gap-2 pointer-events-none items-end">
+    <div className="fixed bottom-20 right-4 left-4 md:left-auto md:bottom-10 z-200 flex flex-col gap-2 pointer-events-none items-end">
       {toasts.map(t => (
         <div key={t.id} className="pointer-events-auto glass-modal flex items-center gap-3 p-4 rounded-xl shadow-2xl animate-in slide-in-from-bottom-5 md:slide-in-from-right duration-300 w-full md:w-[360px] border border-white/10 backdrop-blur-xl bg-[#0B0C0E]/90">
           <div className="shrink-0">
@@ -563,15 +565,16 @@ const CloudProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   const connect = async (url: string, user: string, pass: string) => {
-    // Normalize URL (remove trailing slash)
+    // Normalize URL (remove trailing slash) and password (remove spaces)
     const normalizedUrl = url.replace(/\/$/, '');
+    const normalizedPass = pass.replace(/\s/g, '');
     setIsLoading(true);
     try {
       const res = await fetch(`${normalizedUrl}/wp-json/wp/v2/users/me`, {
-        headers: getHeaders(user, pass)
+        headers: getHeaders(user, normalizedPass)
       });
       if (res.ok) {
-        const newConfig = { wpUrl: normalizedUrl, wpUser: user, wpPass: pass };
+        const newConfig = { wpUrl: normalizedUrl, wpUser: user, wpPass: normalizedPass };
         setConfig(newConfig);
         localStorage.setItem('dc_cloud_config', JSON.stringify(newConfig));
         setIsConnected(true);
@@ -582,6 +585,7 @@ const CloudProvider = ({ children }: { children?: ReactNode }) => {
         throw new Error('Invalid credentials');
       }
     } catch (e) {
+      console.error('Connection error details:', e);
       addToast('Chyba pripojenia. Skontrolujte URL a CORS.', 'error');
       return false;
     } finally {
@@ -660,7 +664,8 @@ const CloudProvider = ({ children }: { children?: ReactNode }) => {
   const downloadToVFS = async (file: CloudFile) => {
     addToast('Sťahujem do VFS...', 'loading');
     try {
-      const res = await fetch(file.source_url);
+      // Try with CORS mode, often needed for canvas/blob operations from external domains
+      const res = await fetch(file.source_url, { mode: 'cors', credentials: 'omit' });
       const blob = await res.blob();
       
       // Convert blob to base64/string for VFS storage
@@ -720,7 +725,7 @@ const GlobalStyles = () => (
 );
 
 const MetricCard = ({ label, value, color, icon: Icon }: any) => (
-  <div className="p-5 rounded-2xl border border-white/5 bg-white/[0.02] relative overflow-hidden group">
+  <div className="p-5 rounded-2xl border border-white/5 bg-white/2 relative overflow-hidden group">
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2 text-text-sec">
         <Icon size={16} />
@@ -755,8 +760,8 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
   }, [config]);
 
   return (
-    <div className="fixed inset-0 z-[160] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-sm glass-modal rounded-[32px] p-8 shadow-2xl">
+    <div className="fixed inset-0 z-150 flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl animate-in fade-in duration-200">
+      <div className="w-full max-w-sm glass-modal rounded-[32px] p-8 shadow-2xl flex flex-col h-dvh md:h-auto justify-center">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-brand-accent/10 rounded-xl text-brand-accent"><Settings size={20}/></div>
@@ -773,7 +778,7 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
         {tab === 'general' ? (
           <div className="space-y-6">
             <div>
-              <label className="text-[10px] uppercase tracking-widest text-text-sec mb-3 block flex items-center gap-2"><Palette size={12}/> Akcentná Farba</label>
+              <label className="text-[10px] uppercase tracking-widest text-text-sec mb-3 flex items-center gap-2"><Palette size={12}/> Akcentná Farba</label>
               <div className="grid grid-cols-6 gap-2 mb-3">
                 {colors.map(c => (
                   <button 
@@ -786,7 +791,7 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
               </div>
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-widest text-text-sec mb-3 block flex items-center gap-2"><Link size={12}/> API Endpoint</label>
+              <label className="text-[10px] uppercase tracking-widest text-text-sec mb-3 flex items-center gap-2"><Link size={12}/> API Endpoint</label>
               <input 
                 className="w-full bg-black border border-white/10 rounded-2xl px-5 py-4 text-xs text-white outline-none focus:border-brand-accent transition-all font-mono" 
                 value={apiEndpoint} 
@@ -806,8 +811,9 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
               <input className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-xs text-white outline-none" value={wpUrl} onChange={e => setWpUrl(e.target.value)} placeholder="https://mysite.com" />
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-widest text-text-sec mb-2 block">Username</label>
+              <label className="text-[10px] uppercase tracking-widest text-text-sec mb-2 block">WP Login Username</label>
               <input className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-xs text-white outline-none" value={wpUser} onChange={e => setWpUser(e.target.value)} placeholder="admin" />
+              <p className="text-[9px] text-text-sec mt-1">Tvoje WordPress prihlasovacie meno (nie display name)</p>
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-widest text-text-sec mb-2 block">App Password</label>
@@ -818,7 +824,7 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
             ) : (
               <button onClick={() => connect(wpUrl, wpUser, wpPass)} className="w-full py-3 bg-brand-accent text-white rounded-xl text-xs font-bold uppercase">Pripojiť</button>
             )}
-            <p className="text-[9px] text-text-sec mt-2">Použite "Application Passwords" v profile používateľa vo WP.</p>
+            <p className="text-[9px] text-text-sec mt-2">💡 WP Admin → Users → Profile → Application Passwords → Add New</p>
           </div>
         )}
 
@@ -882,7 +888,7 @@ const MobileEditor = () => {
   if (!editingFile) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] bg-root flex flex-col animate-slide-up">
+    <div className="fixed inset-0 z-150 bg-root flex flex-col animate-slide-up">
       <div className="h-14 shrink-0 bg-surface border-b border-white/5 flex items-center justify-between px-4">
         <div className="flex items-center gap-3 overflow-hidden">
           <button onClick={closeEditor} className="p-2 -ml-2 text-text-sec active:text-white"><ArrowLeft size={20}/></button>
@@ -960,11 +966,77 @@ const BottomNav = ({ currentView, setView }: { currentView: string, setView: (v:
   </nav>
 );
 
+const CloudPreviewModal = ({ file, onClose, onDelete, onDownload }: { file: CloudFile, onClose: () => void, onDelete: (id: number) => void, onDownload: (f: CloudFile) => void }) => {
+  const { addToast } = useToast();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Format date safely
+  const dateStr = file.date ? new Date(file.date).toLocaleDateString('sk-SK', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+  return (
+    <div className="fixed inset-0 z-200 flex flex-col bg-black/95 backdrop-blur-2xl animate-in fade-in duration-200">
+      {/* Header */}
+      <div className="h-16 shrink-0 flex items-center justify-between px-4 bg-linear-to-b from-black/50 to-transparent z-10">
+        <button onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
+          <ArrowLeft size={24} />
+        </button>
+      </div>
+
+      {/* Main Content (Image) */}
+      <div className="flex-1 flex items-center justify-center p-4 overflow-hidden relative" onClick={onClose}>
+        {file.media_details?.sizes?.full?.source_url || file.source_url ? (
+           <img src={file.source_url} className="max-w-full max-h-full object-contain drop-shadow-2xl shadow-black rounded-lg" alt="" onClick={(e) => e.stopPropagation()} />
+        ) : (
+           <div className="flex flex-col items-center gap-4 text-text-sec">
+             <File size={64} strokeWidth={1} />
+             <p>Náhľad nie je k dispozícii</p>
+           </div>
+        )}
+      </div>
+
+      {/* Bottom Sheet / Metadata */}
+      <div className="bg-surface/80 backdrop-blur-3xl border-t border-white/10 p-6 pb-safe rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <div className="mb-6">
+          <h3 className="text-white font-bold text-lg mb-1 truncate leading-tight">{file.title.rendered || 'Untitled'}</h3>
+          <div className="flex items-center gap-3 text-xs text-text-sec font-mono">
+             <span>{file.mime_type.toUpperCase()}</span>
+             {dateStr && <><span>•</span><span>{dateStr}</span></>}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+           <button onClick={() => { navigator.clipboard.writeText(file.source_url); addToast('Odkaz skopírovaný', 'success'); }} className="flex flex-col items-center gap-2 group">
+             <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-white group-active:scale-95 transition-all group-hover:bg-white/10">
+               <Link size={24} />
+             </div>
+             <span className="text-[10px] uppercase font-bold text-text-sec tracking-wider">Link</span>
+           </button>
+
+           <button onClick={() => onDownload(file)} className="flex flex-col items-center gap-2 group">
+             <div className="w-14 h-14 rounded-2xl bg-brand-accent flex items-center justify-center text-white shadow-lg shadow-brand-accent/30 group-active:scale-95 transition-all group-hover:brightness-110">
+               <Download size={24} />
+             </div>
+             <span className="text-[10px] uppercase font-bold text-white tracking-wider">Stiahnuť</span>
+           </button>
+
+           <button onClick={() => { if(confirm('Naozaj vymazať?')) { onDelete(file.id); onClose(); } }} className="flex flex-col items-center gap-2 group">
+             <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 group-active:scale-95 transition-all group-hover:bg-red-500/20">
+               <Trash2 size={24} />
+             </div>
+             <span className="text-[10px] uppercase font-bold text-red-500/70 tracking-wider">Vymazať</span>
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CloudView = () => {
   const { isConnected, cloudFiles, uploadFile, deleteFile, fetchFiles, isLoading, downloadToVFS } = useCloud();
   const { toggleSettings } = useSettings();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { addToast } = useToast();
+  const [previewFile, setPreviewFile] = useState<CloudFile | null>(null);
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -992,62 +1064,68 @@ const CloudView = () => {
   return (
     <div className="h-full flex flex-col bg-black">
       {/* Cloud Toolbar */}
-      <div className="h-14 shrink-0 bg-surface/50 border-b border-white/5 flex items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <Cloud size={16} className="text-brand-accent" />
-          <span className="text-xs font-bold uppercase tracking-widest text-white">WP Storage</span>
-          <span className="bg-white/10 text-text-sec px-1.5 py-0.5 rounded text-[10px] font-mono">{cloudFiles.length}</span>
+      <div className="h-14 shrink-0 bg-surface/50 border-b border-white/5 flex items-center justify-between px-4 gap-4 overflow-hidden backdrop-blur-md sticky top-0 z-10">
+        <div className="flex items-center gap-2 min-w-0">
+          <Cloud size={16} className="text-brand-accent shrink-0" />
+          <span className="text-xs font-bold uppercase tracking-widest text-white truncate">devCloud - made by H4CK3D | CLOUD</span>
+          <span className="bg-white/10 text-text-sec px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0">{cloudFiles.length}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => fetchFiles()} className={`p-2 rounded-xl bg-white/5 text-text-sec hover:text-white ${isLoading ? 'animate-spin' : ''}`}>
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => fetchFiles()} className={`p-2 rounded-xl bg-white/5 text-text-sec hover:text-white transition-colors ${isLoading ? 'animate-spin' : ''}`}>
             <RefreshCw size={16} />
           </button>
-          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-3 py-2 bg-brand-accent/10 text-brand-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-accent/20 transition-colors">
+          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-3 py-2 bg-brand-accent/10 text-brand-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-accent/20 transition-colors shrink-0">
             <Upload size={14} /> Upload
           </button>
-          <input type="file" ref={fileInputRef} className="hidden" onChange={handleUpload} />
+          <input type="file" ref={fileInputRef} className="hidden" onChange={handleUpload} accept="image/*,video/*,audio/*" />
         </div>
       </div>
 
       {/* Cloud Grid */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 content-start">
         {isLoading && cloudFiles.length === 0 ? (
           <div className="flex items-center justify-center h-40"><Loader2 className="animate-spin text-brand-accent" /></div>
+        ) : !isLoading && cloudFiles.length === 0 ? (
+           <div className="py-20 flex flex-col items-center justify-center opacity-20">
+             <Cloud size={48} className="mb-2 text-white"/>
+             <p className="text-xs uppercase tracking-widest text-text-sec">Cloud je prázdny</p>
+           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {cloudFiles.map(file => (
-              <div key={file.id} className="group relative aspect-square rounded-2xl bg-white/[0.03] border border-white/5 overflow-hidden hover:border-white/20 transition-all">
+              <div key={file.id} 
+                   onClick={() => setPreviewFile(file)}
+                   className="group relative aspect-square rounded-2xl bg-white/5 border border-white/5 overflow-hidden active:scale-95 transition-all cursor-pointer">
                 {file.media_details?.sizes?.thumbnail ? (
-                  <img src={file.media_details.sizes.thumbnail.source_url} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" alt="" />
+                  <img src={file.media_details.sizes.thumbnail.source_url} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="" />
+                ) : file.media_details?.sizes?.medium ? (
+                  <img src={file.media_details.sizes.medium.source_url} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="" />
                 ) : (
-                   <div className="w-full h-full flex items-center justify-center text-text-sec"><File size={32} /></div>
+                   <div className="w-full h-full flex items-center justify-center text-text-sec bg-white/5"><File size={32} strokeWidth={1.5} /></div>
                 )}
                 
-                {/* Overlay */}
-                <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-3">
-                   <div className="text-[10px] text-white font-medium truncate">{file.title.rendered || 'Untitled'}</div>
-                   <div className="flex justify-end gap-2">
-                      <button onClick={() => { navigator.clipboard.writeText(file.source_url); addToast('URL skopírovaná', 'success'); }} className="p-1.5 bg-white/10 rounded-lg text-white hover:bg-white/20"><Link size={12}/></button>
-                      <button onClick={() => downloadToVFS(file)} className="p-1.5 bg-brand-accent/20 text-brand-accent rounded-lg hover:bg-brand-accent/30"><Download size={12}/></button>
-                      <button onClick={() => deleteFile(file.id)} className="p-1.5 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500/30"><Trash2 size={12}/></button>
-                   </div>
-                </div>
-                
-                {/* Type Badge */}
-                <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/60 rounded text-[9px] font-mono text-white/70 backdrop-blur-sm">
+                {/* Visual indicator of selection/hover */}
+                <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-colors" />
+
+                {/* File extension badge */}
+                <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/40 backdrop-blur-md rounded text-[9px] font-mono text-white/90 border border-white/5 pointer-events-none">
                   {file.mime_type.split('/')[1].toUpperCase()}
                 </div>
               </div>
             ))}
           </div>
         )}
-        {!isLoading && cloudFiles.length === 0 && (
-           <div className="py-20 flex flex-col items-center justify-center opacity-20">
-             <Image size={48} className="mb-2 text-white"/>
-             <p className="text-xs uppercase tracking-widest text-text-sec">Cloud je prázdny</p>
-           </div>
-        )}
       </div>
+      
+      {/* Preview Modal */}
+      {previewFile && (
+        <CloudPreviewModal 
+          file={previewFile} 
+          onClose={() => setPreviewFile(null)} 
+          onDelete={(id) => { deleteFile(id); setPreviewFile(null); }}
+          onDownload={downloadToVFS}
+        />
+      )}
     </div>
   );
 };
@@ -1065,10 +1143,10 @@ const DashboardView = ({ isSidebarOpen, onCloseSidebar }: { isSidebarOpen: boole
   return (
     <div className="h-full flex relative overflow-hidden">
       {/* Mobile Sidebar Overlay */}
-      <div className={`fixed inset-0 bg-black/80 z-[60] md:hidden backdrop-blur-sm transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={onCloseSidebar} />
+      <div className={`fixed inset-0 bg-black/80 z-60 md:hidden backdrop-blur-sm transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={onCloseSidebar} />
       
       {/* Sidebar - Acts as drawer on mobile */}
-      <aside className={`fixed inset-y-0 left-0 z-[70] w-72 bg-[#050505] border-r border-white/5 flex flex-col transition-transform duration-300 transform md:relative md:transform-none ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed left-0 top-0 bottom-0 w-64 bg-surface border-r border-white/5 flex flex-col z-70 md:relative md:translate-x-0 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-5 pt-safe md:pt-5 border-b border-white/5">
            <div className="flex items-center justify-between md:hidden mb-4">
               <h2 className="text-[10px] font-mono text-text-sec uppercase tracking-widest">Menu</h2>
@@ -1087,16 +1165,18 @@ const DashboardView = ({ isSidebarOpen, onCloseSidebar }: { isSidebarOpen: boole
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
           {projects.map(p => (
-            <button key={p.id} onClick={() => { setSelectedId(p.id); onCloseSidebar(); }} className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${selectedId === p.id ? 'bg-white/10 border border-white/10' : 'hover:bg-white/5 border border-transparent'}`}>
-              <div className="flex flex-col items-start">
-                <span className="text-sm font-medium text-white">{p.name}</span>
-                <span className="text-[10px] text-text-sec font-mono">{p.language}</span>
+            <div key={p.id} onClick={() => { setSelectedId(p.id); haptic(); }} className={`px-4 py-3.5 rounded-xl cursor-pointer border transition-all ${selectedId === p.id ? 'bg-brand-accent/10 border-brand-accent/30' : 'bg-white/3 border-white/5 hover:border-white/10'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium text-white">{p.name}</span>
+                  <span className="text-[10px] text-text-sec font-mono">{p.language}</span>
+                </div>
+                <div className={`w-2 h-2 rounded-full ${p.status === 'running' ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`} />
               </div>
-              <div className={`w-2 h-2 rounded-full ${p.status === 'running' ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`} />
-            </button>
+            </div>
           ))}
         </div>
-      </aside>
+      </div>
 
       {/* Main Content */}
       <main className="flex-1 bg-black p-4 md:p-8 overflow-y-auto w-full">
@@ -1195,7 +1275,7 @@ const FilesView = () => {
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {nodes.map(node => (
-          <div key={node.name} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/5 active:bg-white/10 transition-all" onClick={() => node.type === 'dir' ? cd(node.name) : openEditor(node.name, cat(node.name) || '')}>
+          <div key={node.name} className="flex items-center justify-between p-4 rounded-2xl bg-white/3 border border-white/5 active:bg-white/10 transition-all" onClick={() => node.type === 'dir' ? cd(node.name) : openEditor(node.name, cat(node.name) || '')}>
             <div className="flex items-center gap-4 flex-1 truncate">
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${node.type === 'dir' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-white/5 text-text-sec'}`}>
                 {node.type === 'dir' ? <Folder size={24} /> : <FileText size={24} />}
@@ -1226,7 +1306,7 @@ const FilesView = () => {
         <button onClick={() => setCreating('dir')} className="flex-1 h-14 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest active:scale-95 transition-transform text-white"><FolderPlus size={18}/> Priečinok</button>
       </div>
       {creating && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
+        <div className="fixed inset-0 z-160 flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
           <div className="w-full max-w-sm glass-modal rounded-[32px] p-8">
             <h3 className="text-xl font-bold mb-6 text-white">Nový {creating === 'file' ? 'súbor' : 'priečinok'}</h3>
             <input className="w-full bg-black border border-white/10 rounded-2xl px-5 py-4 text-white mb-6 outline-none focus:border-brand-accent" placeholder="Názov..." autoFocus value={inputVal} onChange={e => setInputVal(e.target.value)} />
@@ -1382,7 +1462,7 @@ const TerminalView = () => {
   return (
     <div className="h-full flex flex-col bg-black font-mono text-sm p-4 pt-4" onClick={() => inputRef.current?.focus()}>
       <div className="flex-1 overflow-y-auto space-y-1 text-green-400 no-scrollbar pb-16">
-        {lines.map((l, i) => <div key={i} className="whitespace-pre-wrap break-words">{l}</div>)}
+        {lines.map((l, i) => <div key={i} className="whitespace-pre-wrap wrap-break-word">{l}</div>)}
         <div className="flex gap-2 items-center">
           <span className="text-white/40 shrink-0">➜</span>
           <input ref={inputRef} className="bg-transparent border-none outline-none text-inherit w-full min-w-0" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { execute(input); setInput(''); } }} autoFocus spellCheck={false} />
@@ -1410,9 +1490,21 @@ const LoginScreen = () => {
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-4 sm:p-6 bg-root">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-brand-accent/10 blur-[60px] sm:blur-[100px] rounded-full pointer-events-none" />
-      <div className="relative w-full max-w-sm glass-modal rounded-[32px] sm:rounded-[40px] p-6 sm:p-10 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+    <div className="relative min-h-dvh w-full flex items-center justify-center bg-root overflow-hidden px-4">
+      {/* Audio reactive background */}
+      <AudioCloudCanvas
+        className="absolute inset-0 z-0"
+        audioUrl="https://ma77os-media-assets.s3.us-east-2.amazonaws.com/audio/paradise_circus.mp3"
+        mode="cubic"
+        theme="pinkBlue"
+        numParticles={4200}
+        radius={3}
+        distance={650}
+        size={0.55}
+      />
+
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-brand-accent/10 blur-[60px] sm:blur-[100px] rounded-full pointer-events-none z-1" />
+      <div className="relative z-10 w-full max-w-sm glass-modal rounded-[32px] sm:rounded-[40px] p-6 sm:p-10 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-500">
         <div className="w-14 h-14 sm:w-16 sm:h-16 bg-brand-accent rounded-[20px] mx-auto mb-6 sm:mb-8 flex items-center justify-center shadow-2xl shadow-brand-accent/30 animate-pulse">
           <ShieldCheck size={28} className="text-white sm:w-8 sm:h-8" />
         </div>
@@ -1448,10 +1540,10 @@ const MainLayout = () => {
   const { isSettingsOpen, toggleSettings } = useSettings();
   
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-root overflow-hidden text-white font-sans">
+    <div className="h-dvh w-full flex flex-col bg-root overflow-hidden text-white font-sans fixed inset-0">
       <Header currentView={view} setView={setView} onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
       
-      <main className="flex-1 pt-14 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 h-[100dvh] relative overflow-hidden">
+      <main className="flex-1 w-full h-full pt-14 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 relative overflow-hidden">
         {view === 'files' ? <FilesView /> : view === 'term' ? <TerminalView /> : view === 'cloud' ? <CloudView /> : <DashboardView isSidebarOpen={sidebarOpen} onCloseSidebar={() => setSidebarOpen(false)} />}
       </main>
 
